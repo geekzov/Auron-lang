@@ -17,30 +17,43 @@ class Lexer:
     def tokenize(self):
         tokens = []
         while self.pos < len(self.text):
-            if self.text[self.pos].isspace():
+            current_char = self.text[self.pos]
+            
+            # Skip whitespace
+            if current_char.isspace():
                 self.pos += 1
                 continue
-            elif self.text[self.pos] == '/':
-                if self.pos + 1 < len(self.text) and self.text[self.pos + 1] == '/':
-                    self.tokenize_comment()  # Handle single-line comments
-                    continue
-                elif self.pos + 1 < len(self.text) and self.text[self.pos + 1] == '*':
-                    self.tokenize_multiline_comment()  # Handle multi-line comments
-                    continue
-            elif self.text[self.pos].isalpha():
+            
+            # Handle comments
+            elif current_char == '#':
+                self.tokenize_comment()
+            
+            # Handle identifiers and keywords
+            elif current_char.isalpha() or current_char == '_':
                 tokens.append(self.tokenize_identifier())
-            elif self.text[self.pos].isdigit():
+            
+            # Handle numbers
+            elif current_char.isdigit():
                 tokens.append(self.tokenize_number())
-            elif self.text[self.pos] == '"':
+            
+            # Handle strings
+            elif current_char == '"':
                 tokens.append(self.tokenize_string())
-            elif self.text[self.pos:self.pos + 2] in ['==', '!=', '<=', '>=', '+=', '-=', '*=', '/=']:
+            
+            # Handle multi-character operators
+            elif self.text[self.pos:self.pos + 2] in ['==', '!=', '<=', '>=']:
                 tokens.append(Token('OPERATOR', self.text[self.pos:self.pos + 2]))
                 self.pos += 2
-            elif self.text[self.pos] in ['+', '-', '*', '/', '=', '<', '>', '(', ')', '{', '}', ';']:
-                tokens.append(Token('OPERATOR', self.text[self.pos]))
+            
+            # Handle single-character operators
+            elif current_char in ['+', '-', '*', '/', '=', '<', '>', '(', ')', '{', '}', ';']:
+                tokens.append(Token('OPERATOR', current_char))
                 self.pos += 1
+            
+            # Handle unexpected characters
             else:
-                raise ValueError(f"Unexpected character: {self.text[self.pos]} at position {self.pos}")
+                raise ValueError(f"Unexpected character: {current_char}")
+        
         return tokens
 
     def tokenize_identifier(self):
@@ -48,7 +61,10 @@ class Lexer:
         while self.pos < len(self.text) and (self.text[self.pos].isalnum() or self.text[self.pos] == '_'):
             self.pos += 1
         value = self.text[start:self.pos]
-        if value in ['if', 'else', 'while', 'for', 'fn', 'return', 'var', 'let', 'const']:
+        
+        # Check for keywords
+        keywords = ['if', 'else', 'while', 'for', 'fn', 'return', 'var', 'let', 'const', 'print']
+        if value in keywords:
             return Token('KEYWORD', value)
         return Token('IDENTIFIER', value)
 
@@ -56,13 +72,17 @@ class Lexer:
         start = self.pos
         while self.pos < len(self.text) and (self.text[self.pos].isdigit() or self.text[self.pos] == '.'):
             self.pos += 1
-        return Token('NUMBER', float(self.text[start:self.pos]))
+        value = self.text[start:self.pos]
+        return Token('NUMBER', float(value) if '.' in value else int(value))
 
     def tokenize_string(self):
         self.pos += 1  # Skip opening quote
         start = self.pos
         while self.pos < len(self.text) and self.text[self.pos] != '"':
-            self.pos += 1
+            if self.text[self.pos] == '\\':  # Handle escape sequences
+                self.pos += 2  # Skip escape character and the next character
+            else:
+                self.pos += 1
         if self.pos == len(self.text):
             raise ValueError("Unterminated string")
         value = self.text[start:self.pos]
@@ -70,38 +90,22 @@ class Lexer:
         return Token('STRING', value)
 
     def tokenize_comment(self):
-        self.pos += 2  # Skip '//'
         while self.pos < len(self.text) and self.text[self.pos] != '\n':
-            self.pos += 1
-
-    def tokenize_multiline_comment(self):
-        self.pos += 2  # Skip '/*'
-        while self.pos < len(self.text):
-            if self.text[self.pos] == '*' and self.pos + 1 < len(self.text) and self.text[self.pos + 1] == '/':
-                self.pos += 2  # Skip '*/'
-                return
-            self.pos += 1
-        raise ValueError("Unterminated multi-line comment")
-
+            self.pos += 1  # Skip comment until end of line
 
 # Example usage
 if __name__ == "__main__":
     sample_code = """
     fn main() {
-        var x = 5; // Initialize x
+        var x = 5;
         let y = "Hello, Auron!";
+        # This is a comment
         if (x > 3) {
             print(y);
         }
-        /* This is a 
-           multi-line comment */
-        y += " Welcome!";
     }
     """
     lexer = Lexer(sample_code)
-    try:
-        tokens = lexer.tokenize()
-        for token in tokens:
-            print(token)
-    except ValueError as e:
-        print(f"Error: {e}")
+    tokens = lexer.tokenize()
+    for token in tokens:
+        print(token)
